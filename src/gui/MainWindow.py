@@ -1,8 +1,10 @@
+import typing
 from pathlib import Path
 
 import fiona
 from PyQt6.QtWidgets import QGridLayout, QPushButton, QMainWindow, QWidget, QFileDialog, QComboBox, QLabel, QHBoxLayout, \
     QStatusBar, QLineEdit
+from geopandas import GeoDataFrame
 from pyqttoast import Toast, ToastPreset, ToastPosition
 
 from src import GeoUtils
@@ -77,6 +79,7 @@ class MainWindow(QMainWindow):
             self._last_save_dir = self._last_open_dir if not self._last_save_dir else self._last_save_dir
 
             self.gdf = GeoUtils.read_geo_zip(self._filepath)
+
             with fiona.open(f'zip://{self._filepath}') as f:
                 schema = f.schema
             print(f'Read {self._filepath} with {len(self.gdf)} features')
@@ -95,14 +98,18 @@ class MainWindow(QMainWindow):
 
     def _on_save_button_clicked(self):
         if self.gdf is not None:
-            GeoUtils.overwrite_zip(self.gdf, self._filepath)
-            toast = Toast()
-            toast.setDuration(6000)
-            toast.setTitle('Save complete!')
-            toast.setText(f'File <strong>{self._filepath}</strong> has been successfully updated.')
-            toast.applyPreset(ToastPreset.SUCCESS)
-            toast.setPosition(ToastPosition.TOP_MIDDLE)
-            toast.show()
+            try:
+                GeoUtils.overwrite_zip(self.gdf, self._filepath)
+                toast = Toast()
+                toast.setDuration(6000)
+                toast.setTitle('Save complete!')
+                toast.setText(f'File <strong>{self._filepath}</strong> has been successfully updated.')
+                toast.applyPreset(ToastPreset.SUCCESS)
+                toast.setPosition(ToastPosition.TOP_MIDDLE)
+                toast.show()
+                self.table.resetOriginalValues()
+            except Exception as e:
+                print(e)
 
     def _on_saveas_button_clicked(self):
         if self.gdf is not None:

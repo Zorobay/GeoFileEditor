@@ -21,21 +21,18 @@ def write_new_zip(gdf: GeoDataFrame, filepath: str):
         print(e)
 
 def overwrite_zip(gdf: GeoDataFrame, filepath: str):
-    try:
-        filepath = Path(filepath)
-        temp_folder = str(uuid.uuid4())
-        temp_archive_name = str(uuid.uuid4())
-        temp_path = filepath.parent / temp_folder
+    filepath = Path(filepath)
+    temp_folder = str(uuid.uuid4())
+    temp_archive_name = str(uuid.uuid4())
+    temp_path = filepath.parent / temp_folder
 
-        gdf.to_file(str(temp_path), driver='ESRI Shapefile')
-        print(f'Writing to temp. directory {temp_path}')
-        archive_name = shutil.make_archive(str(temp_archive_name), 'zip', str(temp_path))
-        print(f'Creating archive {temp_folder}.zip')
-        os.remove(filepath)
-        print(f'Removing old archive {filepath}')
-        os.rename(archive_name, filepath)
-        print(f'Renaming archive {Path(archive_name).name} -> {filepath.name}')
-        shutil.rmtree(temp_path)
-        print(f'Done overwriting archive {filepath}')
-    except Exception as e:
-        print(e)
+    gdf.to_file(str(temp_path), driver='ESRI Shapefile')
+    print(f'Writing to temp. directory {temp_path}')
+    archive_name = shutil.make_archive(str(temp_archive_name), 'zip', str(temp_path))
+    print(f'Creating archive {temp_folder}.zip')
+    os.remove(filepath)
+    print(f'Removing old archive {filepath}')
+    os.rename(archive_name, filepath)
+    print(f'Renaming archive {Path(archive_name).name} -> {filepath.name}')
+    shutil.rmtree(temp_path)
+    print(f'Done overwriting archive {filepath}')
