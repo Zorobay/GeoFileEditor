@@ -4,10 +4,11 @@ version = "0.1.0"
 description = ""
 authors = ["Sebastian Hegardt <sehe@netcompany.com>"]
 readme = "README.md"
+package-mode=false
 
 [tool.poetry.dependencies]
 python = "^3.12"
-geopandas = "^0.14.4"
+geopandas = "^1.0.1"
 pyqt6 = "^6.7.0"
 fiona = "^1.9.6"
 pyqt-toast-notification = "^1.2.0"

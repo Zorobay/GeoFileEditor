@@ -1,13 +1,12 @@
-import typing
 from pathlib import Path
 
 import fiona
 from PyQt6.QtWidgets import QGridLayout, QPushButton, QMainWindow, QWidget, QFileDialog, QComboBox, QLabel, QHBoxLayout, \
     QStatusBar, QLineEdit
-from geopandas import GeoDataFrame
 from pyqttoast import Toast, ToastPreset, ToastPosition
 
-from src import GeoUtils
+from src import FileUtils
+from src.gui import toasts
 from src.gui.Table import Table
 
 
@@ -78,7 +77,8 @@ class MainWindow(QMainWindow):
             self._last_open_dir = Path(self._filepath).parent
             self._last_save_dir = self._last_open_dir if not self._last_save_dir else self._last_save_dir
 
-            self.gdf = GeoUtils.read_geo_zip(self._filepath)
+            self.geo_type = FileUtils.decide_geo_type(self._filepath)
+            self.gdf = FileUtils.read_geo_zip(self._filepath)
 
             with fiona.open(f'zip://{self._filepath}') as f:
                 schema = f.schema
@@ -99,14 +99,8 @@ class MainWindow(QMainWindow):
     def _on_save_button_clicked(self):
         if self.gdf is not None:
             try:
-                GeoUtils.overwrite_zip(self.gdf, self._filepath)
-                toast = Toast()
-                toast.setDuration(6000)
-                toast.setTitle('Save complete!')
-                toast.setText(f'File <strong>{self._filepath}</strong> has been successfully updated.')
-                toast.applyPreset(ToastPreset.SUCCESS)
-                toast.setPosition(ToastPosition.TOP_MIDDLE)
-                toast.show()
+                FileUtils.overwrite_zip(self.gdf, self._filepath, self.geo_type)
+                toasts.success_toast('Save complete!', f'File <strong>{self._filepath}</strong> has been successfully updated.')
                 self.table.resetOriginalValues()
             except Exception as e:
                 print(e)
@@ -115,7 +109,7 @@ class MainWindow(QMainWindow):
         if self.gdf is not None:
             filepath, _ = QFileDialog.getSaveFileName(self, 'Save File', str(self._last_save_dir))
             self._last_save_dir = Path(self._filepath).parent
-            GeoUtils.write_new_zip(self.gdf, filepath)
+            FileUtils.write_new_zip(self.gdf, filepath, self.geo_type)
 
     def _on_feature_combo_box_change(self, index: int):
         self.table.setFeatureIndex(index)

@@ -7,6 +7,9 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTableView
 from geopandas import GeoDataFrame
 
+from src.DtypeUtils import DtypeUtils, CastException
+from src.gui import toasts
+
 
 class GeoDataFrameTableModel(QAbstractTableModel):
 
@@ -89,14 +92,18 @@ class GeoDataFrameTableModel(QAbstractTableModel):
     def setData(self, index, value, role):
         if role == Qt.ItemDataRole.EditRole:
             key = self._keys[index.row()]
-            self._data.loc[self._feature_index, key] = self._cast_to_dtype(key, value)
+            old_val = self._data.loc[self._feature_index, key]
+            self._data.loc[self._feature_index, key] = self._cast_to_dtype(key, value, old_val)
             return True
 
-    def _cast_to_dtype(self, key: str, value) -> typing.Any:
+    def _cast_to_dtype(self, key: str, new_val, old_val) -> typing.Any:
         dtype = self._schema[key]
-        if value == '':
-            return None
-        return value
+        try:
+            return DtypeUtils.cast_to_dtype(dtype, new_val)
+        except CastException as e:
+            toasts.error_toast('Cast exception!', f'Field <strong>{key}</strong> with value {new_val} can not be cast to type {dtype}. Reverting to old value {old_val}!')
+
+        return old_val
 
     def update(self):
         self.modelReset.emit()
