@@ -5,55 +5,43 @@ from PyQt6.QtCore import QAbstractTableModel, QSortFilterProxyModel
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTableView
-from geopandas import GeoDataFrame
+from pandas import Series
 
-from src.DtypeUtils import DtypeUtils, CastException
-from src.gui import toasts
+from src.DtypeUtils import DtypeUtils
+from src.utils.GeoData import GeoData
 
 
 class GeoDataFrameTableModel(QAbstractTableModel):
 
-    def __init__(self, data: GeoDataFrame, schema: dict):
+    def __init__(self, data: GeoData):
         super().__init__()
         self._feature_index = 0
         self._data = data
-        self._original_attrs = self._extract_data_attrs()
-        self._schema = schema['properties']
-        self._keys = list(self._schema.keys())
+        self._keys = list(self._data.schema().keys())
         self.headers = ['Attribute', 'Value', 'Type']
         self._editable_columns = [1]
 
-    def _extract_data_attrs(self) -> typing.List[dict]:
-        out = []
-        for i in range(self._data.shape[0]):
-            out.append(dict(self._data.loc[i, :]))
-
-        return out
-
     def _get_value(self, key: str) -> typing.Any:
-        return self._data.iloc[self._feature_index].loc[key]
+        return self._data.get_value(self._feature_index, key)
 
     def _get_original_value(self, key: str) -> typing.Any:
-        return self._original_attrs[self._feature_index][key]
+        return self._data.get_original_value(self._feature_index, key)
 
     def resetOriginalValues(self):
-        self._original_attrs = self._extract_data_attrs()
+        self._data.update_original_attrs()
         self.update()
 
     def data(self, index, role):
         key = self._keys[index.row()]
-        value = self._get_value(key)
+        value = self._data.get_value(self._feature_index, key)
+        dtype = self._data.schema()[key]
 
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if index.column() == 0:
                 return key
             elif index.column() == 1:
-                if value is None:
-                    return ''
-                else:
-                    return str(value)
+                return DtypeUtils.to_string(dtype, value)
             elif index.column() == 2:
-                dtype = self._schema[key]
                 if dtype == object:
                     return '?'
                 else:
@@ -69,6 +57,8 @@ class GeoDataFrameTableModel(QAbstractTableModel):
         # If data has been edited, but not saved, color the background
         if role == Qt.ItemDataRole.BackgroundRole:
             orig_value = self._get_original_value(key)
+            if isinstance(value, Series) or isinstance(orig_value, Series):
+                a = 2
             if index.column() == 1 and orig_value != value:
                 return QtGui.QColor('#DBEDFF')
 
@@ -92,18 +82,9 @@ class GeoDataFrameTableModel(QAbstractTableModel):
     def setData(self, index, value, role):
         if role == Qt.ItemDataRole.EditRole:
             key = self._keys[index.row()]
-            old_val = self._data.loc[self._feature_index, key]
-            self._data.loc[self._feature_index, key] = self._cast_to_dtype(key, value, old_val)
+            self._data.set_value(self._feature_index, key, value)
+            # self._data.loc[self._feature_index, key] = self._cast_to_dtype(key, value, old_val)
             return True
-
-    def _cast_to_dtype(self, key: str, new_val, old_val) -> typing.Any:
-        dtype = self._schema[key]
-        try:
-            return DtypeUtils.cast_to_dtype(dtype, new_val)
-        except CastException as e:
-            toasts.error_toast('Cast exception!', f'Field <strong>{key}</strong> with value {new_val} can not be cast to type {dtype}. Reverting to old value {old_val}!')
-
-        return old_val
 
     def update(self):
         self.modelReset.emit()
@@ -121,9 +102,9 @@ class Table(QTableView):
         self.source_model = None
         self.setSortingEnabled(True)
 
-    def setData(self, data: GeoDataFrame, schema: dict):
+    def setData(self, data: GeoData):
         self.model = QSortFilterProxyModel()
-        self.source_model = GeoDataFrameTableModel(data, schema)
+        self.source_model = GeoDataFrameTableModel(data)
         self.model.setSourceModel(self.source_model)
         self.setModel(self.model)
 

@@ -1,9 +1,7 @@
 from pathlib import Path
 
-import fiona
 from PyQt6.QtWidgets import QGridLayout, QPushButton, QMainWindow, QWidget, QFileDialog, QComboBox, QLabel, QHBoxLayout, \
     QStatusBar, QLineEdit
-from pyqttoast import Toast, ToastPreset, ToastPosition
 
 from src import FileUtils
 from src.gui import toasts
@@ -19,7 +17,7 @@ class MainWindow(QMainWindow):
         self._last_open_dir = None
         self._last_save_dir = None
         self._filepath = None
-        self.gdf = None
+        self.data = None
 
         # === Layout ===
         self.layout = QGridLayout()
@@ -78,38 +76,37 @@ class MainWindow(QMainWindow):
             self._last_save_dir = self._last_open_dir if not self._last_save_dir else self._last_save_dir
 
             self.geo_type = FileUtils.decide_geo_type(self._filepath)
-            self.gdf = FileUtils.read_geo_zip(self._filepath)
+            self.data = FileUtils.read_geo_zip(self._filepath)
 
-            with fiona.open(f'zip://{self._filepath}') as f:
-                schema = f.schema
-            print(f'Read {self._filepath} with {len(self.gdf)} features')
+            print(f'Read {self._filepath} with {self.data.num_features()} features')
 
             self.status_bar.showMessage(self._filepath)
 
             self.feature_combo_box.blockSignals(True)
             self.feature_combo_box.clear()
-            for i in range(len(self.gdf)):
+            for i in range(self.data.num_features()):
                 feature = f'Feature {i}'
                 self.feature_combo_box.insertItem(i, feature)
             self.feature_combo_box.blockSignals(False)
 
-            self.table.setData(self.gdf, schema)
+            self.table.setData(self.data)
             self.feature_combo_box.setCurrentIndex(0)
 
     def _on_save_button_clicked(self):
-        if self.gdf is not None:
+        if self.data is not None:
             try:
-                FileUtils.overwrite_zip(self.gdf, self._filepath, self.geo_type)
+                FileUtils.overwrite_zip(self.data, self._filepath, self.geo_type)
                 toasts.success_toast('Save complete!', f'File <strong>{self._filepath}</strong> has been successfully updated.')
                 self.table.resetOriginalValues()
             except Exception as e:
                 print(e)
 
     def _on_saveas_button_clicked(self):
-        if self.gdf is not None:
+        if self.data is not None:
             filepath, _ = QFileDialog.getSaveFileName(self, 'Save File', str(self._last_save_dir))
             self._last_save_dir = Path(self._filepath).parent
-            FileUtils.write_new_zip(self.gdf, filepath, self.geo_type)
+            FileUtils.write_new_zip(self.data, filepath, self.geo_type)
+            toasts.success_toast('Save complete!', f'File <strong>{self._filepath}</strong> has been successfully created.')
 
     def _on_feature_combo_box_change(self, index: int):
         self.table.setFeatureIndex(index)

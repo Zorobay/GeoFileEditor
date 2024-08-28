@@ -6,10 +6,11 @@ import uuid
 from pathlib import Path
 from zipfile import ZipFile
 
+import fiona
 import geopandas
-from geopandas import GeoDataFrame
 
 from src.geotype import GeoType, MAPINFO, SHAPEFILE
+from src.utils.GeoData import GeoData
 
 REG_TAB_FILE = re.compile(r'\w+\.tab')
 REG_SHP_FILE = re.compile(r'\w+\.shp')
@@ -30,13 +31,16 @@ def read_zip_filelist(filepath: str) -> typing.List[str]:
         return f.namelist()
 
 
-def read_geo_zip(filepath: str) -> GeoDataFrame:
-    return geopandas.read_file(filepath)
+def read_geo_zip(filepath: str) -> GeoData:
+    gdf = geopandas.read_file(filepath, engine='fiona')
+    with fiona.open(f'zip://{filepath}') as f:
+        schema = f.schema
+    return GeoData(gdf, schema)
 
 
-def write_new_zip(gdf: GeoDataFrame, filepath: str, geo_type: GeoType):
+def write_new_zip(data: GeoData, filepath: str, geo_type: GeoType):
     try:
-        gdf.to_file(filepath, driver=geo_type.driver)
+        data.write_to_file(filepath, geo_type)
         archive_name = shutil.make_archive(str(filepath), 'zip', str(filepath))
         shutil.rmtree(filepath)
         print(f'Done writing archive {archive_name}')
@@ -44,19 +48,20 @@ def write_new_zip(gdf: GeoDataFrame, filepath: str, geo_type: GeoType):
         print(e)
 
 
-def overwrite_zip(gdf: GeoDataFrame, filepath: str, geo_type: GeoType):
+def overwrite_zip(gdf: GeoData, filepath: str, geo_type: GeoType):
     filepath = Path(filepath)
     temp_folder = str(uuid.uuid4())
     temp_archive_name = str(uuid.uuid4())
     temp_path = filepath.parent / temp_folder
 
-    gdf.to_file(str(temp_path), driver=geo_type.driver)
     print(f'Writing to temp. directory {temp_path} with type {geo_type.name}')
-    archive_name = shutil.make_archive(str(temp_archive_name), 'zip', str(temp_path))
+    gdf.write_to_file(str(temp_path), geo_type)
     print(f'Creating archive {temp_folder}.zip')
-    os.remove(filepath)
+    archive_name = shutil.make_archive(str(temp_archive_name), 'zip', str(temp_path))
     print(f'Removing old archive {filepath}')
-    os.rename(archive_name, filepath)
+    os.remove(filepath)
     print(f'Renaming archive {Path(archive_name).name} -> {filepath.name}')
-    shutil.rmtree(temp_path)
+    os.rename(archive_name, filepath)
     print(f'Done overwriting archive {filepath}')
+    shutil.rmtree(temp_path)
+    print(f'Removed temp file {temp_path}')
